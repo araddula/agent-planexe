@@ -58,9 +58,11 @@ PROGRESS.md    execution record, initially empty of fabricated results
 STATE.json     compact resume state
 ```
 
+The plan is designed to be handed to a lower-cost execution model. Each task should identify the exact files and symbols involved, required context and decisions, implementation steps, expected behavior, edge cases, validation, acceptance criteria, and out-of-scope work. A stronger planning model resolves architecture; the executor performs the scoped implementation.
+
 ### `/planexe-execute <feature-name>`
 
-Reads the current task from `STATE.json`, loads only the context needed for it, implements and validates it, then updates progress and state. It should follow the plan rather than redesigning the feature.
+Reads `STATE.json` first, then loads the current task and only its referenced context, implements and validates it, and updates progress and state. It should follow the plan rather than redesigning the feature. If the handoff is incomplete, it should report the gap instead of inventing architecture or rediscovering the whole repository.
 
 ### `/planexe-status <feature-name>`
 

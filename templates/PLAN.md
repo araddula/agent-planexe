@@ -134,14 +134,34 @@ Tasks must have stable identifiers.
 
 Describe exactly what this task must accomplish.
 
+**Prerequisites**
+
+List completed tasks, dependencies, assumptions, or decisions required before starting.
+
+**Execution Context**
+
+List the exact repository files and symbols to inspect or change. Reference the relevant sections of `repository-context.md` and `DECISIONS.md`. Do not require broad repository rediscovery.
+
 **Implementation**
 
-* `<step>`
-* `<step>`
+1. `<concrete step>`
+2. `<concrete step>`
+
+**Expected Behavior**
+
+Describe the observable behavior, data flow, or code-level result after this task.
+
+**Edge Cases and Failure Behavior**
+
+Describe relevant boundary conditions, errors, and how they must be handled.
 
 **Files**
 
-* `<path>`
+* `<path>`, `<symbol or section>`, `<modify or reference>`
+
+**Out of Scope**
+
+* `<related work this task must not perform>`
 
 **Validation**
 
@@ -226,6 +246,8 @@ The planner should:
 6. resolve architectural decisions before execution when possible
 7. keep tasks independently understandable
 8. give every task a stable `PLX-*` identifier
+9. make every task executable by a lower-cost model without broad repository rediscovery
+10. identify the exact context, symbols, behavior, edge cases, validation, and boundaries needed for the handoff
 
 The executor should follow this document unless an implementation reality requires deviation.
 

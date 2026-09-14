@@ -45,9 +45,9 @@ It describes:
 * risks
 * open questions
 
-The plan describes what should be implemented and how.
+The plan describes what should be implemented and how. It is also the handoff contract from the planner to an executor that may be a lower-cost model.
 
-It should contain enough detail for the executor to implement tasks without repeatedly rediscovering the repository.
+It should contain enough evidence-based detail for the executor to implement tasks without repeatedly rediscovering the repository or making unresolved architectural decisions.
 
 ---
 
@@ -132,6 +132,14 @@ Each task should define:
 
 What the task accomplishes.
 
+### Prerequisites
+
+Tasks, decisions, assumptions, or conditions that must be satisfied first.
+
+### Execution Context
+
+Exact repository files and symbols to inspect or modify, plus targeted references to repository context and decisions. The task should identify what the executor needs to read without requiring broad repository exploration.
+
 ### Dependencies
 
 Tasks that must be completed first.
@@ -147,6 +155,14 @@ Files to:
 ### Implementation
 
 Concrete instructions for the executor.
+
+### Expected Behavior
+
+The observable behavior, data flow, or code-level result expected after implementation.
+
+### Edge Cases and Failure Behavior
+
+Relevant boundary conditions, errors, and required handling.
 
 ### Behavior
 
@@ -164,6 +180,10 @@ How completion should be verified.
 
 Observable conditions that establish task completion.
 
+### Out of Scope
+
+Related work that the executor must not perform as part of this task.
+
 ---
 
 ## Task Independence
@@ -172,12 +192,13 @@ Tasks should be independently understandable where practical.
 
 An executor should be able to read:
 
-1. repository context
+1. compact execution state
 2. current task
-3. relevant decisions
-4. recent progress
+3. explicitly referenced repository context
+4. explicitly referenced decisions
+5. targeted recent progress when needed
 
-and understand what to do without reading the entire feature history.
+and understand what to do without reading the entire feature history or reopening broad architectural investigation. If the task is incomplete or ambiguous, the executor should report the handoff gap rather than inventing a design.
 
 ---
 

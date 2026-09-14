@@ -64,14 +64,7 @@ Locate:
 <resolved-workspace>/features/<feature-name>/
 ```
 
-Read:
-
-```text
-PLAN.md
-PROGRESS.md
-DECISIONS.md
-STATE.json
-```
+Read `STATE.json` first. It is the compact routing index for the feature. After resolving the current task, read only the corresponding task in `PLAN.md`, the explicitly referenced sections of `DECISIONS.md` and `repository-context.md`, and targeted recent `PROGRESS.md` entries when needed.
 
 If the feature does not exist, report that planning must happen first.
 
@@ -91,7 +84,9 @@ Determine:
 
 Do not assume that the first task is the current task.
 
-If `STATE.json` conflicts with `PROGRESS.md` or `PLAN.md`, report the inconsistency before making changes.
+Confirm that `STATE.json.currentTask` exists in `PLAN.md`, that its status is eligible for execution, and that explicitly referenced artifacts are available. Report a blocking inconsistency before making changes.
+
+Broad artifact consistency checks belong to `/planexe-status`; execution should not load complete verbose history solely to perform that report.
 
 Do not silently rewrite history to make artifacts agree.
 
@@ -111,9 +106,11 @@ Read the corresponding task in:
 PLAN.md
 ```
 
-Read only the additional repository context required to execute that task.
+Read only the additional repository context explicitly referenced by that task or required to verify its acceptance condition.
 
 Avoid unnecessary repository-wide rediscovery.
+
+If the task does not identify enough context, files, symbols, behavior, or validation to proceed safely, stop and report an incomplete handoff. Do not silently invent architecture or compensate by rediscovering the entire repository.
 
 ---
 

@@ -6,6 +6,8 @@ Create an implementation-ready plan for a feature.
 
 The planner performs the expensive repository and feature reasoning once and persists the result as execution artifacts.
 
+The plan is a handoff contract for an executor that may have a smaller context window or lower reasoning capability than the planner. It must contain enough concrete, evidence-based detail for that executor to implement each task without reopening broad architectural investigation.
+
 It does not implement the feature.
 
 ---
@@ -195,10 +197,17 @@ Tasks must be independently understandable.
 Each task should define:
 
 * objective
+* prerequisites and dependencies
+* exact files and symbols to inspect or change
+* required repository context and decision references
 * implementation steps
-* affected files
+* expected behavior
+* edge cases and failure behavior
 * validation
 * acceptance condition
+* explicit out-of-scope boundaries
+
+Do not leave architectural choices or implementation strategy for the executor when repository evidence can resolve them during planning. Use concise references to files and symbols instead of copying large source excerpts or adding speculative pseudocode.
 
 ---
 
@@ -268,6 +277,8 @@ The planner must:
 8. make tasks executable by another agent
 9. preserve existing feature decisions unless deliberately revising them
 10. record material design decisions in `DECISIONS.md`
+11. design each task as a self-contained handoff for a lower-cost executor
+12. perform a final handoff review to confirm every task identifies what to read, what to change, how to validate it, and when to stop
 
 ---
 
