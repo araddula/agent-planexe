@@ -1,454 +1,170 @@
 # Agent Planexe
 
-> Turn expensive repository understanding and feature reasoning into persistent execution artifacts that AI agents can consume incrementally.
+> Persist repository and feature reasoning once, then let AI agents execute from compact, inspectable state.
 
-Agent Planexe is a lightweight, host-independent workflow for AI-assisted software development.
+Agent Planexe is a host-independent workflow for AI-assisted software development. It separates repository discovery, feature planning, implementation, progress, and execution state.
 
-It separates:
+The purpose is not to remove reasoning. It is to avoid paying the same repository-understanding cost on every implementation step.
 
-* repository understanding
-* feature planning
-* implementation
-* progress tracking
-* execution state
+## The Token Model
 
-The goal is simple:
+Planexe uses a two-phase model:
 
-**reason deeply once, persist the result, then execute incrementally without repeatedly rediscovering the repository.**
+| Phase | Pays for | Reuses |
+| --- | --- | --- |
+| Bootstrap and plan | Repository discovery, architecture decisions, affected files, and validation design | `repository-context.md`, `PLAN.md`, `DECISIONS.md` |
+| Execute | The current task, its relevant code, and validation | `STATE.json` plus the current task and recent progress |
 
----
-
-## How It Works
+The intended loop is:
 
 ```text
-Repository
-    │
-    ▼
-/planexe-bootstrap
-    │
-    ├── repository-context.md
-    │
-    ▼
-/planexe-plan
-    │
-    ├── PLAN.md
-    ├── DECISIONS.md
-    ├── PROGRESS.md
-    └── STATE.json
-    │
-    ▼
-/planexe-execute
-    │
-    ├── implement current task
-    ├── validate
-    ├── update progress
-    └── update state
-    │
-    ▼
-/planexe-status
-    │
-    └── inspect current state
+repository
+    -> bootstrap -> repository-context.md
+    -> plan      -> PLAN.md + DECISIONS.md + PROGRESS.md + STATE.json
+    -> execute   -> one task + focused validation
+    -> status    -> read-only inspection
 ```
 
-The expensive reasoning happens during planning.
+This saves tokens when the plan is accurate and execution stays scoped. It does not guarantee fewer tokens for every feature: a large plan, stale context, repeated validation failures, or an oversized progress log can erase the benefit.
 
-Execution agents then work from the persisted plan instead of repeatedly reconstructing the feature from scratch.
+## How Token Usage Is Controlled
 
----
+Planexe reduces repeated context by design:
 
-## The Four Agents
+* Bootstrap creates durable repository context once.
+* Planning investigates only the feature-relevant parts of the repository.
+* Execution starts from `STATE.json.currentTask` instead of replaying the whole feature.
+* The executor reads only the repository context needed for that task.
+* `STATE.json` stores compact machine-readable state; verbose history belongs in `PROGRESS.md`.
+* Stable task IDs make resumption possible without reconstructing task order.
+* Status is read-only, so checking progress does not rewrite artifacts or trigger new reasoning.
+
+Good artifacts are decision-dense: they name real files, symbols, constraints, commands, and acceptance conditions. A long artifact that repeats generic instructions is a token cost, not a saving.
+
+## The Four Commands
 
 ### `/planexe-bootstrap`
 
-Initializes Planexe for a repository.
+Resolves the workspace and creates or refreshes `repository-context.md`. It discovers the repository; it does not implement features.
 
-It:
+### `/planexe-plan <feature-name>`
 
-* resolves the configured workspace
-* discovers the repository structure
-* identifies important technologies and conventions
-* creates or refreshes `repository-context.md`
-
-It does **not** implement features.
-
----
-
-### `/planexe-plan`
-
-Creates an implementation-ready feature plan.
-
-It:
-
-* reads repository context
-* investigates the relevant code
-* identifies affected files and systems
-* resolves architectural questions
-* defines implementation tasks
-* defines validation strategy
-* records important decisions
-
-It produces:
+Investigates the relevant code and creates an implementation contract in `features/<feature-name>/`:
 
 ```text
-features/<feature-name>/
-├── PLAN.md
-├── PROGRESS.md
-├── DECISIONS.md
-└── STATE.json
+PLAN.md        requirements, design, tasks, validation, risks
+DECISIONS.md   material decisions and rationale
+PROGRESS.md    execution record, initially empty of fabricated results
+STATE.json     compact resume state
 ```
 
----
+### `/planexe-execute <feature-name>`
 
-### `/planexe-execute`
+Reads the current task from `STATE.json`, loads only the context needed for it, implements and validates it, then updates progress and state. It should follow the plan rather than redesigning the feature.
 
-Implements the plan incrementally.
+### `/planexe-status <feature-name>`
 
-It:
+Reports workspace, task, validation, progress, and artifact inconsistencies without modifying anything.
 
-1. reads the current feature state
-2. identifies the current task
-3. reads only the context required for that task
-4. implements the task
-5. validates the result
-6. updates `PROGRESS.md`
-7. updates `STATE.json`
+## Workspace
 
-Execution should follow the plan rather than redesigning the feature.
-
----
-
-### `/planexe-status`
-
-Provides a read-only view of Planexe state.
-
-It reports:
-
-* current feature
-* current task
-* completed tasks
-* blocked tasks
-* validation status
-* inconsistencies between artifacts
-
-It does not modify repository or Planexe state.
-
----
-
-# Workspace
-
-Planexe stores its working artifacts in a configurable workspace.
-
-The default is:
+Artifacts use one resolved workspace. The built-in default is repository-local and Git-ignored:
 
 ```text
-.planexe/
+<repository>/.planexe/
 ```
 
-Three workspace modes are supported.
+The supported modes are:
 
-### 1. `repository-local-gitignored`
+* `repository-local-gitignored` - local working state, normally excluded from Git.
+* `repository-local-committed` - shared artifacts tracked in the repository.
+* `external` - artifacts stored at `~/agent-planexe/<repository-identity>/`.
 
-Default.
+Configuration is resolved in this order:
 
-```text
-repository/
-└── .planexe/
-```
+1. `<repository>/.planexe/config.json`
+2. `~/agent-planexe/config.json` repository-specific setting
+3. `~/agent-planexe/config.json` global workspace setting
+4. built-in default
 
-The entire `.planexe/` directory is ignored by Git.
+The installation itself is always `~/agent-planexe/`. Workspace mode does not move or copy existing artifacts. See [docs/configuration.md](docs/configuration.md) for the full contract.
 
-Use this when Planexe artifacts are primarily local working state.
-
----
-
-### 2. `repository-local-committed`
-
-```text
-repository/
-└── .planexe/
-```
-
-The entire `.planexe/` directory is tracked by Git.
-
-Use this when the team intentionally wants to share Planexe artifacts through the repository.
-
----
-
-### 3. `external`
-
-Planexe stores artifacts outside the repository:
-
-```text
-~/agent-planexe/<repository-identity>/
-```
-
-This keeps Planexe artifacts separate from the repository.
-
-The Planexe installation itself also lives at:
-
-```text
-~/agent-planexe/
-```
-
-For example:
-
-```text
-~/agent-planexe/
-├── core/
-├── adapters/
-├── templates/
-├── docs/
-├── config.json
-└── <repository-identity>/
-    ├── repository-context.md
-    └── features/
-```
-
-The external workspace uses the same internal structure as `.planexe/`.
-
----
-
-# Configuration
-
-Configuration can exist at two levels.
-
-### Repository configuration
-
-```text
-.planexe/config.json
-```
-
-### Global configuration
-
-```text
-~/agent-planexe/config.json
-```
-
-Precedence:
-
-```text
-repository-local configuration
-        ↓
-global configuration
-        ↓
-built-in defaults
-```
-
-The repository configuration therefore has the highest priority.
-
-The default workspace mode is:
-
-```text
-repository-local-gitignored
-```
-
-See:
-
-```text
-docs/configuration.md
-```
-
-for the complete configuration contract.
-
----
-
-# Feature Artifacts
-
-Each feature gets its own directory:
-
-```text
-<workspace>/
-└── features/
-    └── <feature-name>/
-        ├── PLAN.md
-        ├── PROGRESS.md
-        ├── DECISIONS.md
-        └── STATE.json
-```
-
-### PLAN.md
-
-The implementation contract.
-
-Contains:
-
-* requirements
-* acceptance criteria
-* architecture
-* data flow
-* API behavior
-* UI behavior
-* affected files
-* implementation tasks
-* testing strategy
-* risks
-
----
-
-### PROGRESS.md
-
-The actual execution record.
-
-Contains:
-
-* completed work
-* files changed
-* validation results
-* blockers
-* deviations
-* implementation notes
-
----
-
-### DECISIONS.md
-
-The reasoning record.
-
-Contains important decisions and their rationale.
-
----
-
-### STATE.json
-
-Compact machine-readable state.
-
-It allows an execution agent to resume without reading the entire history.
-
----
-
-# Getting Started
-
-Clone the repository:
+## Getting Started
 
 ```bash
 git clone <repository-url>
 cd agent-planexe
-```
-
-Install Planexe:
-
-```bash
 ./scripts/install.sh
 ```
 
-The installation is placed at:
-
-```text
-~/agent-planexe/
-```
-
-Then make the desired adapter available to your AI host.
-
-Initialize a repository:
+Then make the adapter available to the AI host and run:
 
 ```text
 /planexe-bootstrap
-```
-
-Create a feature plan:
-
-```text
 /planexe-plan <feature-name>
-```
-
-Execute the plan:
-
-```text
 /planexe-execute <feature-name>
-```
-
-Inspect progress:
-
-```text
 /planexe-status <feature-name>
 ```
 
----
+### VS Code Chat Prompts
 
-# Important Safety Behavior
+To make the `/planexe-*` prompts available in VS Code Chat, add the installed prompt directory to `chat.promptFilesLocations`:
 
-Planexe agents should:
+1. Open VS Code Settings and search for **Prompt Files Locations**.
+2. Add this to `settings.json`:
 
-* preserve unrelated user changes
-* avoid destructive Git operations
-* never reset or clean the repository
-* never silently change `.gitignore`
-* never commit changes automatically
-* never push changes automatically
-* never move or delete feature artifacts automatically
-* never create duplicate workspaces
-* keep execution scoped to the active feature
-* report inconsistencies rather than silently correcting them
-
-If `.planexe/` needs to be added to `.gitignore`, Planexe must ask for permission first.
-
----
-
-# Repository Structure
-
-```text
-agent-planexe/
-├── README.md
-├── LICENSE
-├── .gitignore
-│
-├── core/
-│   ├── planexe-bootstrap.md
-│   ├── planexe-plan.md
-│   ├── planexe-execute.md
-│   └── planexe-status.md
-│
-├── adapters/
-│   ├── vscode/
-│   │   └── prompts/
-│   │       ├── planexe-bootstrap.prompt.md
-│   │       ├── planexe-plan.prompt.md
-│   │       ├── planexe-execute.prompt.md
-│   │       └── planexe-status.prompt.md
-│   │
-│   └── agent-host/
-│       └── agents/
-│           ├── planexe-bootstrap.agent.md
-│           ├── planexe-plan.agent.md
-│           ├── planexe-execute.agent.md
-│           └── planexe-status.agent.md
-│
-├── templates/
-│   ├── PLAN.md
-│   ├── PROGRESS.md
-│   ├── DECISIONS.md
-│   └── STATE.json
-│
-├── docs/
-│   ├── architecture.md
-│   ├── workflow.md
-│   ├── configuration.md
-│   └── plan-format.md
-│
-└── scripts/
-    ├── install.sh
-    └── audit.sh
+```json
+{
+    "chat.promptFilesLocations": {
+        "~/agent-planexe/adapters/vscode/prompts": true
+    }
+}
 ```
 
----
 
-# Design Philosophy
+For a complete walkthrough, see [docs/workflow.md](docs/workflow.md).
 
-Planexe is intentionally small.
+## Safety and Control
 
-It does not attempt to replace:
+Planexe agents must preserve unrelated user changes and must not:
 
-* AI coding agents
-* IDEs
-* Git
-* CI/CD
-* code review systems
-* project management systems
+* reset, clean, commit, or push Git changes automatically;
+* silently modify `.gitignore`;
+* create duplicate workspaces or migrate artifacts;
+* move or delete feature artifacts;
+* silently repair inconsistencies between plan, progress, and state.
 
-Instead, it provides a persistent reasoning and execution contract around them.
+Artifacts remain inspectable and editable by developers. If `.planexe/` needs to be added to `.gitignore`, the agent must ask first.
 
-The central idea is:
+## Repository Layout
 
-> **Do the expensive repository and feature reasoning once. Persist it in inspectable artifacts. Let execution agents consume that reasoning incrementally.**
+```text
+core/                   canonical host-independent specifications
+adapters/vscode/        VS Code prompt adapters
+adapters/agent-host/    Agent Host adapters
+templates/              feature artifact templates
+docs/                   architecture, workflow, configuration, and format contracts
+scripts/install.sh      installer
+scripts/audit.sh        consistency and structure checks
+```
 
-This makes AI-assisted implementation more resumable, inspectable, and efficient.
+Adapters are intentionally thin: the canonical behavior belongs in `core/`. The detailed contracts are documented in:
+
+* [docs/architecture.md](docs/architecture.md)
+* [docs/workflow.md](docs/workflow.md)
+* [docs/configuration.md](docs/configuration.md)
+* [docs/plan-format.md](docs/plan-format.md)
+
+## Design Boundary
+
+Planexe is a persistence and execution contract around an AI coding agent. It does not replace the agent, IDE, Git, CI/CD, code review, or project management tools.
+
+Its efficiency depends on disciplined artifact maintenance:
+
+* keep `STATE.json` small;
+* keep `PROGRESS.md` factual and summarized;
+* update `repository-context.md` when durable repository assumptions change;
+* add only material decisions to `DECISIONS.md`;
+* keep tasks independently understandable and narrowly scoped.
+
+When those rules hold, execution can resume with a small, targeted context instead of rediscovering the repository for every task.
