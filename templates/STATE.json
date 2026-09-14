@@ -1,0 +1,16 @@
+{
+"feature": "<feature-name>",
+"status": "planned",
+"currentTask": "PLX-001",
+"tasks": {
+"PLX-001": "not_started",
+"PLX-002": "not_started"
+},
+"blockedTasks": [],
+"lastValidation": {
+"command": null,
+"result": null,
+"timestamp": null
+},
+"updatedAt": null
+}

@@ -1,1 +1,18 @@
+.DS_Store
 
+# Local development
+
+.env
+.env.*
+!.env.example
+
+# Editor / IDE
+
+.idea/
+.vscode/
+
+# OS / temporary files
+
+*.tmp
+*.swp
+*~
